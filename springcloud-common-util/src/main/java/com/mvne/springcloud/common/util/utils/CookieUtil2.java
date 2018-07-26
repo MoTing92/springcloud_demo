@@ -11,19 +11,14 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.mvne.springcloud.common.util.model.UserInfo;
-
-import lombok.extern.slf4j.Slf4j;
-
 /**
- * 改工具类将用户名保存在cookie中，不同用户用“@”符号拼接，用户和密码之间用“#”符号拼接，
- * 获取cookie是返回List<Map<String,UserInfo>>
+ * 改工具类将用户名保存在cookie中，不同用户用“@”符号拼接，
+ * 获取cookie是返回List<String>
  * 设置cookie时需要传入最大保存的用户名数
  * @author MoTing
  *
  */
-@Slf4j
-public class CookieUtil {
+public class CookieUtil2 {
 
 	 /**
      * 根据名字获取cookie
@@ -69,51 +64,41 @@ public class CookieUtil {
      *            保存值
      * @author jxf
      */
-    public static List<UserInfo> getCookieAsList(String cookieValue){
+    public static List<String> getCookieAsList(String cookieValue){
     	String[] loginInfoArray = cookieValue.split("@");
-		List<UserInfo> list = new ArrayList<>();
+		List<String> list = new ArrayList<>();
 		for (int i = 0; i < loginInfoArray.length; i++) {
-			String[] loginInfo = loginInfoArray[i].split("#");
-			try {
-				UserInfo user = new UserInfo();
-				if(loginInfo[0].isEmpty()) {
-					System.err.println("cookie工具类-用户名为空");
-					log.error("cookie工具类-用户名为空");
-				}
-				user.setUsername(loginInfo[0]);
-				if(loginInfo[1].isEmpty()) {
-					System.err.println("cookie工具类-密码为空");
-					log.error("cookie工具类-密码为空");
-				}
-				user.setPassword(loginInfo[1]);
-				list.add(user);
-			}catch (ArrayIndexOutOfBoundsException e) {
-				System.err.println("密码为空");
-				return null;
-			} catch (Exception e) {
-				e.printStackTrace();;
-				return null;
-			}
+			list.add(loginInfoArray[i]);
 		} 
     	return list;
     }
-    
-    private static String cookieListToString(List<UserInfo> list) {
+    /**
+     * 
+     * @param list 要转换成字符串的List集合
+     * @return 将集合元素用@符号拼接返回
+     */
+    private static String cookieListToString(List<String> list) {
 		String cookieString = "";
-    	for (int i = 0; i < list.size(); i++) {
-    		if(i == 0 && list.size() == 1) {
-    			cookieString += list.get(i).getUsername()+"#"+list.get(i).getPassword();
-    			continue;
-    		}
-    		if(i == list.size()-1 && list.size() != 1) {
-    			cookieString += list.get(i).getUsername()+"#"+list.get(i).getPassword();
-    			break;
-    		}
-    		cookieString += list.get(i).getUsername()+"#"+list.get(i).getPassword() + "@";
+    	for (String username : list) {
+    		if(cookieString.isEmpty()) {
+				cookieString = username;
+			}else {
+				cookieString = cookieString+"@"+username;
+			}
 		}
     	return cookieString;
     	
     }
+    /**
+     * 
+     * @param response 响应
+     * @param name cookie名称
+     * @param value 要添加到cookie中的值
+     * @param time 设置cookie的有效时间
+     * @param request 请求
+     * @param cookieNumber 设置保存到cookie中的值的数量
+     * @return 将修改后的cookie放进响应中返回响应response
+     */
     public static HttpServletResponse setCookie(HttpServletResponse response, String name, String value,int time,HttpServletRequest request,int cookieNumber) {
     	// new一个Cookie对象,键值对为参数
     	String newCookieValue = "";
@@ -122,36 +107,26 @@ public class CookieUtil {
     	try {
     		cookie = getCookieByName(request,name);
     		orgCookievalue = cookie.getValue();
-    		String[] loginInfo = value.split("#");
-    		String username = loginInfo[0];
-    		String password = loginInfo[1];
-    		List<UserInfo> list = getCookieAsList(orgCookievalue);
-    		for (UserInfo user : list) {
-				if(user.getUsername().equals(username) && user.getPassword().equals(password)) {
+    		List<String> list = getCookieAsList(orgCookievalue);
+    		String chgCookieString = "";
+    		for (String string : list) {
+				if(string.equals(value)) {
 					return response;
-				}else if(user.getUsername().equals(username) && !user.getPassword().equals(password)) {
-					user.setPassword(password);
-					String chgCookieString = cookieListToString(list);
-    				cookie.setValue(chgCookieString);
-    				cookie = cookieSetting(cookie, chgCookieString, time);
-    				response.addCookie(cookie);
-    				return response;
 				}
 			}
-    		String chgCookieString = "";
-			if(list.size() >= cookieNumber) {
-    			List<UserInfo> overList = new ArrayList<>();
+    		if(list.size() >= cookieNumber) {
+    			List<String> overList = new ArrayList<>();
     			for (int i = list.size() - cookieNumber; i < list.size() - 1; i++) {
     				overList.add(list.get(i));
 				}
-    			chgCookieString  = cookieListToString(overList);
+    			chgCookieString = cookieListToString(overList);
     		}else {
     			chgCookieString = cookieListToString(list);
     		}
     		if(orgCookievalue.isEmpty()) {
     			newCookieValue = value;
 			}else {
-				newCookieValue = value + "@" + chgCookieString ;
+				newCookieValue = value + "@" + chgCookieString;
 			}
     		cookie.setValue(newCookieValue);
 		} catch (NullPointerException e) {
@@ -166,7 +141,13 @@ public class CookieUtil {
         response.addCookie(cookie); // addCookie后，如果已经存在相同名字的cookie，则最新的覆盖旧的cookie
         return response;
     }
-    
+    /**
+     * 
+     * @param cookie 要进行属性配置的cookie
+     * @param value cookie值
+     * @param time 有效时间
+     * @return 返回修改后的cookie
+     */
     private static Cookie cookieSetting(Cookie cookie,String value,int time) {
     	cookie.setPath("/");
         // 如果cookie的值中含有中文时，需要对cookie进行编码，不然会产生乱码
